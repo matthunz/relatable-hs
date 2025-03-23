@@ -12,9 +12,11 @@ import Data.Proxy
 import GHC.OverloadedLabels
 import GHC.TypeLits
 
-type family Lookup (key :: Symbol) (db :: [(Symbol, Type)]) where
-  Lookup key ('(key, a) ': db) = a
-  Lookup key ('(key', a) ': db) = Lookup key db
+data (a :: Symbol) ::: b = (Alias a) ::: b
+
+type family Lookup (key :: Symbol) (env :: [Type]) where
+  Lookup key (a ::: b ': env) = b
+  Lookup key (x ': env) = Lookup key env
 
 data Op = AddOp | SubOp | MulOp | DivOp
 
@@ -32,19 +34,19 @@ instance Show UnaryOp where
   show NotOp = "NOT"
   show SignumOp = "SIGNUM"
 
-data Expr (db :: [(Symbol, Type)]) a where
-  ColumnExpr :: (KnownSymbol key) => Alias key -> Expr db (Lookup key db)
-  LitExpr :: a -> Expr db a
-  OpExpr :: Expr db a -> Op -> Expr db a -> Expr db a
-  UnaryOpExpr :: UnaryOp -> Expr db a -> Expr db a
+data Expr (env :: [Type]) (a :: Type) where
+  ColumnExpr :: (KnownSymbol key) => Alias key -> Expr env (Lookup key env)
+  LitExpr :: a -> Expr env a
+  OpExpr :: Expr env a -> Op -> Expr env a -> Expr env a
+  UnaryOpExpr :: UnaryOp -> Expr env a -> Expr env a
 
-instance (Show a) => Show (Expr db a) where
+instance (Show a) => Show (Expr env a) where
   show (ColumnExpr p) = symbolVal p
   show (LitExpr a) = show a
   show (OpExpr a op b) = "(" ++ show a ++ " " ++ show op ++ " " ++ show b ++ ")"
   show (UnaryOpExpr op a) = show op ++ " " ++ show a
 
-instance (Num a) => Num (Expr db a) where
+instance (Num a) => Num (Expr env a) where
   fromInteger = LitExpr . fromInteger
   (+) lhs = OpExpr lhs AddOp
   (-) lhs = OpExpr lhs SubOp
@@ -53,10 +55,10 @@ instance (Num a) => Num (Expr db a) where
   signum = UnaryOpExpr SignumOp
   negate = UnaryOpExpr NegOp
 
-column :: (KnownSymbol key) => Alias key -> Expr db (Lookup key db)
+column :: (KnownSymbol key) => Alias key -> Expr env (Lookup key env)
 column = ColumnExpr
 
-lit :: a -> Expr db a
+lit :: a -> Expr env a
 lit = LitExpr
 
 newtype Alias (ident :: Symbol) = Alias (Proxy ident)
