@@ -1,13 +1,12 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 module Main where
 
-import Data.Proxy
 import Relatable
 
 q :: Expr '[ '("foo", Int)] Int
-q = AddExpr (ColumnExpr (Proxy @"foo")) (LitExpr 1)
+q = column #foo + lit 1
 
 main :: IO ()
 main = print q
