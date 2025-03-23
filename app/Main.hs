@@ -1,8 +1,13 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
+
 module Main where
 
-import qualified MyLib (someFunc)
+import Data.Proxy
+import Relatable
+
+q :: Expr '[ '("foo", Int)] Int
+q = AddExpr (ColumnExpr (Proxy @"foo")) (LitExpr 1)
 
 main :: IO ()
-main = do
-  putStrLn "Hello, Haskell!"
-  MyLib.someFunc
+main = print q
