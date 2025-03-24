@@ -26,13 +26,29 @@ type family Lookup (key :: Symbol) (env :: [Type]) where
   Lookup key (a ::: b ': env) = b
   Lookup key (x ': env) = Lookup key env
 
-data Op = AddOp | SubOp | MulOp | DivOp
+data Op b a where
+  AddOp :: Op b Int
+  SubOp :: Op b Int
+  MulOp :: Op b Int
+  DivOp :: Op b Int
+  EqOp :: Op b Bool
+  NeqOp :: Op b Bool
+  LtOp :: Op b Bool
+  LteOp :: Op b Bool
+  GtOp :: Op b Bool
+  GteOp :: Op b Bool
 
-instance Show Op where
+instance Show (Op b a) where
   show AddOp = "+"
   show SubOp = "-"
   show MulOp = "*"
   show DivOp = "/"
+  show EqOp = "="
+  show NeqOp = "!="
+  show LtOp = "<"
+  show LteOp = "<="
+  show GtOp = ">"
+  show GteOp = ">="
 
 data UnaryOp = AbsOp | NegOp | NotOp | SignumOp
 
@@ -45,7 +61,7 @@ instance Show UnaryOp where
 data Expr (env :: [Type]) (a :: Type) where
   ColumnExpr :: (KnownSymbol key) => Alias key -> Expr env (Lookup key env)
   LitExpr :: a -> Expr env a
-  OpExpr :: Expr env a -> Op -> Expr env a -> Expr env a
+  OpExpr :: (Show b) => Expr env b -> Op b a -> Expr env b -> Expr env a
   UnaryOpExpr :: UnaryOp -> Expr env a -> Expr env a
 
 instance (Show a) => Show (Expr env a) where
@@ -54,7 +70,7 @@ instance (Show a) => Show (Expr env a) where
   show (OpExpr a op b) = "(" ++ show a ++ " " ++ show op ++ " " ++ show b ++ ")"
   show (UnaryOpExpr op a) = show op ++ " " ++ show a
 
-instance (Num a) => Num (Expr env a) where
+instance Num (Expr env Int) where
   fromInteger = LitExpr . fromInteger
   (+) lhs = OpExpr lhs AddOp
   (-) lhs = OpExpr lhs SubOp
@@ -68,6 +84,9 @@ column = ColumnExpr
 
 lit :: a -> Expr env a
 lit = LitExpr
+
+eq :: (Show a) => Expr env a -> Expr env a -> Expr env Bool
+eq a = OpExpr a EqOp
 
 data RowT f as where
   Nil :: RowT f '[]
@@ -115,29 +134,42 @@ instance (ToRow f a, ToRow f b, Append (ToRowT f a) (ToRowT f b)) => ToRow f (a 
 
 data Table (ident :: Symbol) (cols :: [Type]) = Table (Proxy ident) (Proxy cols)
 
+type family Columns cols where
+  Columns '[] = '[]
+  Columns (a ::: b ': cols) = b ': Columns cols
+
 type family LookupTable (key :: Symbol) (db :: [Type]) where
   LookupTable key (Table key cols ': db) = cols
   LookupTable key (x ': db) = LookupTable key db
 
-data Stmt (db :: [Type]) (a :: [Type]) where
-  NullStmt :: Stmt db a
-  ProjectStmt :: (Show (RowT (Expr b) a)) => RowT (Expr b) a -> Stmt db b -> Stmt db a
-  TableStmt :: (KnownSymbol ident) => Alias ident -> Stmt db (LookupTable ident db)
+type family LookupTableCols (key :: Symbol) (db :: [Type]) where
+  LookupTableCols key (Table key cols ': db) = Columns cols
+  LookupTableCols key (x ': db) = LookupTableCols key db
 
-instance Show (Stmt db a) where
+data Stmt (db :: [Type]) (env :: [Type]) (a :: [Type]) where
+  NullStmt :: Stmt db env a
+  ProjectStmt :: (Show (RowT (Expr env) a)) => RowT (Expr env) a -> Stmt db env b -> Stmt db env a
+  SelectStmt :: Expr env' Bool -> Stmt db env a -> Stmt db env' a
+  TableStmt :: (KnownSymbol ident) => Alias ident -> Stmt db (LookupTable ident db) (LookupTableCols ident db)
+
+instance Show (Stmt db env a) where
   show NullStmt = "∅"
   show (ProjectStmt row stmt) = "Π[" ++ show row ++ "](" ++ show stmt ++ ")"
+  show (SelectStmt cond stmt) = "σ[" ++ show cond ++ "](" ++ show stmt ++ ")"
   show (TableStmt t) = symbolVal t
 
-empty :: Stmt db a
+empty :: Stmt db env a
 empty = NullStmt
 
 project ::
   (ToRow (Expr env) a, Show (RowT (Expr env) (ToRowT (Expr env) a))) =>
   a ->
-  Stmt db env ->
-  Stmt db (ToRowT (Expr env) a)
+  Stmt db env b ->
+  Stmt db env (ToRowT (Expr env) a)
 project = ProjectStmt . toRow
 
-table :: (KnownSymbol ident) => Alias ident -> Stmt db (LookupTable ident db)
+select :: Expr env Bool -> Stmt db env' b -> Stmt db env b
+select = SelectStmt
+
+table :: (KnownSymbol ident) => Alias ident -> Stmt db (LookupTable ident db) (LookupTableCols ident db)
 table = TableStmt
