@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module Relatable where
 
@@ -102,7 +103,7 @@ instance (Show (f a), Show (RowT f as)) => Show (RowT f (a ': as)) where
         Nil -> ""
         _ -> ", " ++ show as
 
-class ToRow (f :: Type -> Type) a where
+class ToRow (f :: Type -> Type) a |  a -> f where
   type ToRowT f a :: [Type]
 
   toRow :: a -> RowT f (ToRowT f a)

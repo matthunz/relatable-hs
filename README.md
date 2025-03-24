@@ -3,15 +3,13 @@
 ```hs
 import Relatable
 
-q :: Expr '["name" ::: Int] Int
-q = column #name + lit 1
+type Users = '["name" ::: Int]
 
-f :: Expr '["name" ::: Int] Bool
-f = column #name `eq` lit 1
+type DB = '[Table "users" Users]
 
-s :: Stmt '[Table "users" '["name" ::: Int]] '["name" ::: Int] '[Int]
-s = select f . project q $ table #users
+query :: Stmt DB Users '[Int]
+query = select (column #name `eq` lit 1) . project (column #name + lit 1) $ table #users
 
 main :: IO ()
-main = print s
+main = print query
 ```
