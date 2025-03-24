@@ -1,9 +1,6 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE TypeOperators #-}
+# Relatable
 
-module Main where
-
+```hs
 import Relatable
 
 q :: Expr '["name" ::: Int] Int
@@ -17,3 +14,4 @@ s = select f . project q $ table #users
 
 main :: IO ()
 main = print s
+```

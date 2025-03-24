@@ -23,7 +23,7 @@ instance (ident ~ i) => IsLabel i (Alias ident) where
 data (a :: Symbol) ::: b = (Alias a) ::: b
 
 type family Lookup (key :: Symbol) (env :: [Type]) where
-  Lookup key (a ::: b ': env) = b
+  Lookup key (key ::: b ': env) = b
   Lookup key (x ': env) = Lookup key env
 
 data Op b a where
